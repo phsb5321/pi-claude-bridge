@@ -8,6 +8,7 @@
 // put behind its compaction threshold, inherit a verified sibling's metadata
 // and override only identity. Drop the entry when the base is missing too.
 export const DERIVED_FROM: Record<string, { from: string; name: string }> = {
+	"claude-fable-5-2": { from: "claude-fable-5-1", name: "Claude Fable 5.2" },
 	"claude-fable-5-1": { from: "claude-fable-5", name: "Claude Fable 5.1" },
 };
 
@@ -18,7 +19,7 @@ function deriveMissing<T extends { id: string; [key: string]: any }>(piAiModels:
 	return base ? { ...base, id, name: rule.name } : undefined;
 }
 
-export const MODEL_IDS_IN_ORDER = ["claude-fable-5-1", "claude-fable-5", "claude-opus-5", "claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6", "claude-sonnet-5", "claude-sonnet-4-6", "claude-haiku-4-5"];
+export const MODEL_IDS_IN_ORDER = ["claude-fable-5-2", "claude-fable-5-1", "claude-fable-5", "claude-opus-5", "claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6", "claude-sonnet-5", "claude-sonnet-4-6", "claude-haiku-4-5"];
 
 // Project pi-ai's model entries down to the fields pi's registerProvider expects,
 // and keep MODEL_IDS_IN_ORDER ordering. IDs missing from pi-ai are silently dropped.
@@ -69,6 +70,8 @@ export function resolveClaudeCodeRuntimeModel(modelId: string, settings: LongCon
 				contextWindow: useOneM ? ONE_M_CONTEXT : TWO_HUNDRED_K_CONTEXT,
 			};
 		}
+		case "claude-fable-5-2":
+			return { cliModelId: "claude-fable-5-2[1m]", contextWindow: ONE_M_CONTEXT };
 		case "claude-fable-5-1":
 			return { cliModelId: "claude-fable-5-1[1m]", contextWindow: ONE_M_CONTEXT };
 		case "claude-fable-5":
