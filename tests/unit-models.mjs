@@ -105,6 +105,7 @@ describe("claudeCodeModelId", () => {
 	const models = buildModels(MODEL_IDS_IN_ORDER.map(oneM));
 
 	it("returns the measured SDK request id", () => {
+		assert.equal(claudeCodeModelId(find(models, "claude-fable-5-2"), PRO), "claude-fable-5-2[1m]");
 		assert.equal(claudeCodeModelId(find(models, "claude-opus-5"), PRO), "claude-opus-5[1m]");
 		assert.equal(claudeCodeModelId(find(models, "claude-opus-4-8"), PRO), "claude-opus-4-8[1m]");
 		assert.equal(claudeCodeModelId(find(models, "claude-opus-4-7"), PRO), "claude-opus-4-7");
@@ -182,5 +183,59 @@ describe("resolveModel", () => {
 		const model = resolveModel(oneMModels, "opus");
 		assert.equal(model.id, "claude-opus-5");
 		assert.equal(claudeCodeModelId(model, PRO), "claude-opus-5[1m]");
+	});
+});
+
+describe("models absent from pi-ai's snapshot", () => {
+	// pi-ai's catalog is fixed at its release, so a model Anthropic ships later
+	// is missing from it entirely. Deriving from a verified sibling keeps the
+	// registered contextWindow honest instead of inventing one.
+	it("derives a missing id from its declared base", () => {
+		const models = buildModels([mockPiAiModel("claude-fable-5")]);
+		const derived = models.find((m) => m.id === "claude-fable-5-1");
+		assert.ok(derived, "claude-fable-5-1 should be derived from claude-fable-5");
+		assert.equal(derived.name, "Claude Fable 5.1");
+		assert.equal(derived.contextWindow, 200000, "inherits the base entry, not an invented window");
+		assert.equal(derived.maxTokens, 8000);
+		assert.equal(derived.baseUrl, undefined, "projection still strips pi-ai's leaky fields");
+	});
+
+	it("derives Fable 5.2 through its 5.1 sibling and wins the picker order", () => {
+		// The WSL box's pi-ai snapshot knows 5.1 but not 5.2 (measured 10/11/2026).
+		const models = buildModels([mockPiAiModel("claude-fable-5-1"), mockPiAiModel("claude-fable-5")]);
+		const derived = models.find((m) => m.id === "claude-fable-5-2");
+		assert.ok(derived, "claude-fable-5-2 should be derived from claude-fable-5-1");
+		assert.equal(derived.name, "Claude Fable 5.2");
+		assert.equal(models[0].id, "claude-fable-5-2", "newest fable is first, so \"fable\" resolves to it");
+		assert.equal(resolveModel(models, "fable")?.id, "claude-fable-5-2");
+	});
+
+	it("prefers native 5.2 metadata and never duplicates it", () => {
+		const native = { ...mockPiAiModel("claude-fable-5-2"), name: "Native", maxTokens: 128000 };
+		const models = buildModels([native, mockPiAiModel("claude-fable-5-1")]);
+		assert.equal(models.filter((m) => m.id === "claude-fable-5-2").length, 1);
+		assert.equal(models.find((m) => m.id === "claude-fable-5-2").maxTokens, 128000);
+	});
+
+	it("does not invent 5.2 when its 5.1 base is missing", () => {
+		const models = buildModels([mockPiAiModel("claude-opus-5")]);
+		assert.equal(models.find((m) => m.id === "claude-fable-5-2"), undefined);
+	});
+
+	it("drops a derived id when its base is missing too", () => {
+		const models = buildModels([mockPiAiModel("claude-opus-5")]);
+		assert.equal(models.find((m) => m.id === "claude-fable-5-1"), undefined);
+	});
+
+	it("prefers pi-ai's own entry once the catalog catches up", () => {
+		const real = { ...mockPiAiModel("claude-fable-5-1"), name: "Upstream Name" };
+		const models = buildModels([mockPiAiModel("claude-fable-5"), real]);
+		assert.equal(models.find((m) => m.id === "claude-fable-5-1").name, "Upstream Name");
+	});
+
+	it("requests the 1M runtime id for Fable 5.1", () => {
+		assert.deepEqual(resolveClaudeCodeRuntimeModel("claude-fable-5-1", PRO), {
+			cliModelId: "claude-fable-5-1[1m]", contextWindow: 1000000,
+		});
 	});
 });
